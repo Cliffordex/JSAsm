@@ -1,6 +1,6 @@
 <html>
 <head>
-<script src='./jquery-3.0.0.min.js'></script>
+<!--<script src='./jquery-3.0.0.min.js'></script>-->
 <script>
 var variabls = [];
 var consts = []
@@ -335,12 +335,12 @@ function movr(rnum, nnum){
 	if (inr[rnum] === undefined){ inr[rnum] = ""; }
 	//console.log("inr: " + inr[rnum]);
 	//console.log("nnm: " + nnum);
-	if ($.isNumeric(nnum)) nnum = "d" + nnum;
+	if (typeof nnum == "number") nnum = "d" + nnum;
 	if (inr[rnum].indexOf(nnum) < 0)
 		{ setr(rnum, nnum); pout("mov " + rnum + " " + nnum); }
 }
 function pout(ttpo){
-	$("#outdiv").html($("#outdiv").html()+"<br>"+ttpo);
+	 outdiv.innerHTML += "<br>" + ttpo;
 }
 
 function mk8d(incd){
@@ -390,7 +390,7 @@ function oper_mom(ml, opr, nta){
 }
 function goto_lab(labl){
 	var nlab = "_"+labl;
-	if ($("#cdin").val().indexOf(labl+":") < 0) { pout("<b>Label does not exist: <code>" + labl + "</code></b>"); }
+	if (cdin.value.indexOf(labl+":") < 0) { pout("<b>Label does not exist: <code>" + labl + "</code></b>"); }
 	pout("jmp " + nlab);
 }
 function if_iekl(cndtn, kwd, finl){
@@ -477,7 +477,7 @@ function structure(lth){
 		var tcm = lth[idx];
 		if (tcm.startsWith("[") & tcm.endsWith("]")){
 			lth[idx] = "mem";
-		} else if(tcm.startsWith("d") & $.isNumeric(tcm.substr(1)) || isBinary(tcm)){
+		} else if(tcm.startsWith("d") & (typeof parseInt(tcm.substr(1)) == "number") || isBinary(tcm)){
 			lth[idx] = "num";
 		} else if(tcm == "+" | tcm == "-" | tcm == "*" | tcm == "/" | tcm == "="){
 			lth[idx] = "oper";
@@ -487,9 +487,9 @@ function structure(lth){
 			lth[idx] = "eval";
 		} else if (tcm.substr(0,1) == "{" && tcm.substr(-1) == "}"){
 			lth[idx] = "blk";
-		} else if ($("#cdin").val().indexOf(tcm+":") > -1){
+		} else if (cdin.value.indexOf(tcm+":") > -1){
 			lth[idx] = "lab";
-		} else if ($("#cdin").val().indexOf("function " + tcm + " ") > -1){
+		} else if (cdin.value.indexOf("function " + tcm + " ") > -1){
 			lth[idx] = "lab";
 		} else {
 			lth[idx] = "unk";
@@ -531,7 +531,7 @@ function handleln(lth){
 }
 
 function stcd(){
-	var incode = $("#cdin").val().replace("<script", "");
+	var incode =  cdin.value.replace("<script", "");
 	variabls = []; inr = []; umacros = []; consts = [];
 	/*var varis = incode.match(/(\$)\w+(\$)/g);
 	if (varis != null)
@@ -546,12 +546,12 @@ function stcd(){
 	
 	var codelines = parselines(incode);
 	
-	$("#outdiv").html("");
+	 outdiv.innerHTML = "";
 	for (var clidx = 0; clidx < codelines.length; clidx++){
 		handleln(codelines[clidx]);
-		//$("#outdiv").html($("#outdiv").html()+"<br>"+codelines[clidx]);
+		// outdiv").html( outdiv").html()+"<br>"+codelines[clidx]);
 	}
-	localStorage["restoreText"] = $("#outdiv").html().replace(/(\<\/*span[^\>]*\>)/ig,"").replace(/(\<br\s*\/*\>)/ig, "\r\n").trim();
+	localStorage["restoreText"] =  outdiv.innerHTML.replace(/(\<\/*span[^\>]*\>)/ig,"").replace(/(\<br\s*\/*\>)/ig, "\r\n").trim();
 }
 
 function doExtended(pcs){
@@ -576,7 +576,7 @@ function ext_DefASCII(){
 }
 
 function mac_getInpC(pcs){
-	var codelns = parselines($("#cdin").val());
+	var codelns = parselines(cdin.value);
 	if (pcs.length == 2){
 		var prefx = pcs[1];
 		
@@ -596,18 +596,18 @@ function mac_getInpC(pcs){
 	
 }
 
-$(function(){
+document.addEventListener("DOMContentLoaded", function(){
 	if (localStorage["cdincmp"] === undefined){
 	
 	} else {
-		$("#cdin").val(localStorage["cdincmp"]);
+		cdin.value = localStorage["cdincmp"];
 	}
 	
-	if ($("#cdin").val().length < 1) $("#cdin").val(defaultCdin);
+	if ( cdin.value.length < 1)  cdin.value = defaultCdin;
 	
-	$("#cdin").keyup(function(){
-		localStorage["cdincmp"] = $("#cdin").val();
-		$("#outdiv").html("<div align='center' style='color:#AA0000'>Please Compile</div>");
+	cdin.addEventListener("keyup", function(){
+		localStorage["cdincmp"] =  cdin.value;
+		outdiv.innerHTML = "<div align='center' style='color:#AA0000'>Please Compile</div>";
 		//stcd();
 	});
 });
