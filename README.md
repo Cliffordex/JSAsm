@@ -18,18 +18,30 @@ Javascript compiler, stores output in localStorage, which is automatically loade
 Literal command.
 Anything prepended with `~` will be output inline as typed.
 
-## Macros
-Macro command `macro` tells the compiler what to replace, and has several special options.
+## `macro`
+The `macro` command tells the compiler what to replace, and has several special options for matching structures and replacing.
 
 ### Macro structure types
 * `unk` : Argument does not match any known types.
+* `"<literal>"` : Argument must match exactly.
 * `num` : Argument is a number.
 * `mem` : Argument corresponds to a memory location. (either named or literal)
+* `nummem` : Argument is either a number or memory location.
+* `lab` : Argument is a program label
+
 
 #### `%n%`
 Replaces literally with the zero-based nth argument.
 
 Example: `macro mem-"="-nummem { "mov %0% %2%" }`
+
+#### `def`
+Defines a string as something, then replaces all instances of it.
+
+```
+macro "define"-unk-num { def %1% %2% }
+define pi 3.14
+```
 
 
 # jsAssembler
