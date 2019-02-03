@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html>
+<head>
+<!--<script src='./jquery-3.0.0.min.js'></script>-->
+<script>
+var scr = null;
+var err = 0;
+var inmem = null;
+var memlen = 256;
+var execloglen = 20;
+var lmdX = 0;
+var lmdY = 0;
+var rets = [];
+var linesvalid = 0;
+// Function code
+// FLAGS = ERROR|?|?|?|?|CARRY|GREATER|LESSER
+// 00 is zero
+// 01 is less
+// 10 is greater
+// 11 is equal
+// INT = AUTOCLEAR|?|?|?|TOUCH|BIT|BIT|BIT
+
+function SetupPage(){
+	var rgnms = ["int", "flags", "sp", "bp", "posh", "posl", "mem", "tbo", 
+				"r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7"];
+	
+	
+	for (var i = 0; i < rgnms.length; i+=2){
+		regtab.innerHTML += "<tr><td class='reglab' align='center'>" + rgnms[i] + "</td><td class='reglab' align='center'>" + rgnms[i + 1] + "</td></tr>"
+		regtab.innerHTML += "<tr><td class='reg' id='rg_" + rgnms[i] + "'>00000000</td><td class='reg' id='rg_" + rgnms[i + 1] + "'>00000000</td></tr>"
+	}
+	
+	inmem = Array(memlen);
+	for (var i = 0; i < memlen; i++) inmem[i]=0;
+	updmem();
+	
+	// Should use rset?
+	rg_sp.innerHTML = "11111111"; 
+	rg_bp.innerHTML = "11111111"; 
+	
+	for (var i = 0; i < execloglen; i++){
+		execlg.innerHTML += "<div id='elog" + i + "'>-- exec --</div>";
+	}
+}
+function getRandomIntInclusive(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function logexec(tolog){
+	for (var i = 0; i < execloglen-1; i++){
+		window["elog"+i].innerHTML = window["elog"+(i+1)].innerHTML;
+	}
+	window["elog"+(execloglen-1)].innerHTML = tolog;
+}
+
+// Functional Level
+
+function rget(regnam){
+	return parseInt(window["rg_"+regnam].innerHTML, 2);
+}
+function rgete(regnam){
+	return parseInt(window["rg_"+regnam+"h"].innerHTML + window["rg_"+regnam+"l"].innerHTML, 2);
+}
+function rgeth(regnam){
+	return parseInt(window["rg_"+regnam].innerHTML.substr(0,4), 2);
+}
+function rgetl(regnam){
+	return parseInt(window["rg_"+regnam].innerHTML.substr(-4), 2);
+}
+function rset(regnam, nval) { 
+	//$("#rg_"+regnam).addClass("chgd");
+	//if (regnam == "sp") $("
+	//if (!nval) console.error(nval);
+	var nstring = nval.toString(2);
+	while (nstring.length < 8) nstring = "0" + nstring;
+	if (nstring.length > 8) nstring = nstring.substr(-8);
+	window["rg_"+regnam].innerHTML = nstring;
+}
+function rsete(regnam, nval) { 
+	//console.log("setting " + regnam + " to " + nval);
+	//$("#rg_"+regnam).addClass("chgd");
+	var nstring = nval.toString(2);
+	while (nstring.length < 16) nstring = "0" + nstring;
+	if (nstring.length > 16) nstring = nstring.substr(-16);
+	window["rg_"+regnam+"h"].innerHTML = nstring.substr(0,8); 
+	window["rg_"+regnam+"l"].innerHTML = nstring.substr(-8); 
+}
+function rsetl(regnam, nval) { 
+	var nstring = nval.toString(2); var ostr = window["rg_"+regnam].innerHTML.substr(0,4);
+	while (nstring.length < 4) nstring = "0" + nstring;
+	if (nstring.length > 4) nstring = nstring.substr(-4);
+	window["rg_"+regnam].innerHTML = ostr + nstring; 
+}
+function rseth(regnam, nval) { 
+	var nstring = nval.toString(2); var ostr = window["rg_"+regnam].innerHTML.substr(-4);
+	while (nstring.length < 4) nstring = "0" + nstring;
+	if (nstring.length > 4) nstring = nstring.substr(-4);
+	window["rg_"+regnam].innerHTML = nstring + ostr; 
+}
+function rinc(regnam) { rset(regnam, rget(regnam) + 1); }
+function rince(regnam) { rsete(regnam, rgete(regnam) + 1); }
+function radd(regnam, amt) { rset(regnam, rget(regnam) + amt); }
+function radde(regnam, amt) { rsete(regnam, rgete(regnam) + amt); }
+
+function regOnly(regnam){
+	if (!isReg(regnam)){ c_err("Must be register: " + regnam); }
+	return regnam;
+}
+function regMloc(regnam){
+	if (isMem(regnam)) return regnam;
+	if (!isReg(regnam)){ c_err("Must be register or memloc: " + regnam); }
+	return regnam;
+}
+function regMemVal(vl){
+	if (isMem(vl)) return mget(vl);
+	if (isReg(vl)) return rget(vl);
+	if (vl.substr(0,1) == "d") return parseInt(vl.substr(1), 10);
+	if (typeof(vl) === "number") return vl;
+	return parseInt(vl, 2);
+}
+function regVal(vl){
+	if (isMem(vl)) c_err("Memloc is invalid argument.");
+	if (isReg(vl)) return rget(vl);
+	if (vl.substr(0,1) == "d") return parseInt(vl.substr(1), 10);
+	if (typeof(vl) === "number") return vl;
+	return parseInt(vl, 2);
+}
+function regValDest(vl){
+	if (isReg(vl)) return rget(vl);
+	if (vl.substr(0,1) == "d") return parseInt(vl.substr(1), 10);
+	if (typeof(vl) === "number") return vl;
+	var lnspl = getLines();
+	for (var lidx = 0; lidx < lnspl.length; lidx++){
+		if (lnspl[lidx].substr(0,1) == ":"){
+			if (lnspl[lidx].substr(1) == vl) return lidx;
+		}
+	}
+	return parseInt(vl, 2);
+}
+
+function getLines(){
+	return proglns.value.match(/[^\r\n]+/g);
+}
+
+function updmem(){
+	var cspl = rget("sp");
+	var cbpl = rget("bp");
+	var outm = "";
+	for (var i = 0; i < memlen; i++){
+		var nstring = inmem[i].toString(2);
+		while (nstring.length < 8) nstring = "0" + nstring;
+		if (nstring.length > 8) nstring = nstring.substr(-8);
+		var mclasses = "memdiv";
+		if (cspl == i) mclasses += " cursp"; if (cbpl == i) mclasses += " curbp";
+		outm += "<div class='" + mclasses + "'>" + nstring + "</div>";
+	}
+	omem.innerHTML = outm;
+}
+
+function mkoes(otm){
+	var otstr = "";
+	for (var oma = 0; oma < otm; oma++){
+		otstr += "O";
+	}
+	return otstr;
+}
+
+function saveLines(progname){
+	localStorage["sub_p" + progname] = proglns.value;
+}
+function loadLines(progname){
+	proglns.value = localStorage["sub_p" + progname];
+}
+
+function runln(inln){
+	/*$(".chgd"+mkoes(20)).removeClass("chgd"+mkoes(20));
+	for (var oes = 19; oes > -1; oes--){
+		$(".chgd" + mkoes(oes)).addClass("chgd"+mkoes(oes+1)).removeClass("chgd" + mkoes(oes));
+	}*/
+	/*$(".chgdOOOOOOOO").addClass("chgdOOOOOOOOO").removeClass("chgdOOOOOOOO");
+	$(".chgdOOOOOOO").addClass("chgdOOOOOOOO").removeClass("chgdOOOOOOO");
+	$(".chgdOOOOOO").addClass("chgdOOOOOOO").removeClass("chgdOOOOOO");
+	$(".chgdOOOOO").addClass("chgdOOOOOO").removeClass("chgdOOOOO");
+	$(".chgdOOOO").addClass("chgdOOOOO").removeClass("chgdOOOO");
+	$(".chgdOOO").addClass("chgdOOOO").removeClass("chgdOOO");
+	$(".chgdOO").addClass("chgdOOO").removeClass("chgdOO");
+	$(".chgdO").addClass("chgdOO").removeClass("chgdO");
+	$(".chgd").addClass("chgdO").removeClass("chgd");*/
+
+	//document.getElementsByClassName.removeClass("chgd");
+	
+	if (typeof(inln) === "undefined"){ err=1; console.error("End of program."); return; } //End of program.
+	var lnspl = inln.match(/\[.+\]|([^\s]\w+)/g);
+	if (lnspl.length < 1) { return; /* empty line */ }
+	if (lnspl[0].substr(0,1) == ":") { return; /* compiler destination */ }
+	if (lnspl[0] == "nop") { return; }
+	if (lnspl[0] == "rnd") { c_rnd(); return; }
+	if (lnspl[0] == "pnt") { s_pnt(); return; }
+	if (lnspl[0] == "peek") { s_peek(); return; }
+	if (lnspl[0] == "lin") { s_lin(); return; }
+	if (lnspl[0] == "rct") { s_rect(); return; }
+	if (lnspl[0] == "rcta") { s_recta(); return; }
+	if (lnspl[0] == "clr") { s_clr(); return; }
+	if (lnspl[0] == "rets") { c_retsub(); return; }
+	if (lnspl[0] == "pusha") {	m_pushall(); return; }
+	if (lnspl[0] == "popa") {	m_popall(); return; }
+	if(lnspl.length > 3){
+		if (lnspl[0] == "mov" && lnspl[1] == "pos") {	c_mov(regMloc("posl"),	regMemVal(lnspl[2]));	c_mov(regMloc("posh"),	regMemVal(lnspl[3])); return; }
+	}
+	if(lnspl.length > 2){
+		if (lnspl[0] == "mov") {	c_mov(regMloc(lnspl[1]), 	regMemVal(lnspl[2])); return; }
+		if (lnspl[0] == "movl") {	c_movl(regMloc(lnspl[1]),	regMemVal(lnspl[2])); return; }
+		if (lnspl[0] == "movh") {	c_movh(regMloc(lnspl[1]),	regMemVal(lnspl[2])); return; }
+		if (lnspl[0] == "add") {	c_add(regMloc(lnspl[1]), 	regVal(lnspl[2])); return; }
+		if (lnspl[0] == "sub") {	c_sub(regMloc(lnspl[1]),	regVal(lnspl[2])); return; }
+		if (lnspl[0] == "and") {	c_and(regOnly(lnspl[1]),	regVal(lnspl[2])); return; }
+		if (lnspl[0] == "xor") {	c_xor(regOnly(lnspl[1]),	regVal(lnspl[2])); return; }
+		if (lnspl[0] == "or") {		c_or(regOnly(lnspl[1]),		regVal(lnspl[2])); return; }
+		if (lnspl[0] == "cmp") {	c_cmp(regMemVal(lnspl[1]),	regMemVal(lnspl[2])); return; }
+		if (lnspl[0] == "shr") {	c_shr(regOnly(lnspl[1]),	regMemVal(lnspl[2])); return; }
+		if (lnspl[0] == "shl") {	c_shl(regOnly(lnspl[1]),	regMemVal(lnspl[2])); return; }
+		if (lnspl[0] == "ror") {	c_ror(regOnly(lnspl[1]),	regMemVal(lnspl[2])); return; }
+		if (lnspl[0] == "rol") {	c_rol(regOnly(lnspl[1]),	regMemVal(lnspl[2])); return; }
+		if (lnspl[0] == "swp") {	c_swp(regOnly(lnspl[1]),	regOnly(lnspl[2])); return; }
+		
+	}
+	if (lnspl.length > 1){
+		/// Backwards compat. Throw 'em a bone. Should be using mov tbo [val] though.
+		if (lnspl[0] == "turbo") {	rset("tbo", regMemVal(lnspl[1])); return;	}
+		if (lnspl[0] == "jmp") {	c_jmp(regValDest(lnspl[1])); return; }
+		if (lnspl[0] == "jz") {		c_jz(regValDest(lnspl[1])); return; }
+		if (lnspl[0] == "jnz") {	c_jnz(regValDest(lnspl[1])); return; }
+		if (lnspl[0] == "jg") {		c_jg(regValDest(lnspl[1])); return; }
+		if (lnspl[0] == "jl") {		c_jl(regValDest(lnspl[1])); return; }
+		if (lnspl[0] == "sz") {		c_sz(regVal(lnspl[1])); return; }
+		if (lnspl[0] == "snz") {	c_snz(regVal(lnspl[1])); return; }
+		if (lnspl[0] == "int") {	c_int(regVal(lnspl[1])); return; }	
+		if (lnspl[0] == "runs") {	c_runsub(lnspl[1]); return;}
+		if (lnspl[0] == "push" && lnspl[1] == "pos") {	m_push("pos"); return; }
+		if (lnspl[0] == "push") {	m_push(regVal(lnspl[1])); return; }
+		if (lnspl[0] == "pop") {	m_pop(regOnly(lnspl[1])); return; }
+	}
+	
+	c_err("Unrecognized input \"" + inln + "\".");
+}
+
+function progstep(){
+	var proglns = getLines();
+	var cln = rgete("pos");
+	if (runln(proglns[cln]) != 1) { logexec(cln + ": " + proglns[cln]); }
+	var nln = rgete("pos");
+	if (nln != cln) { logexec(cln + "> "+proglns[nln]); }
+	rince("pos");
+	updmem();
+}
+function progrun(){
+	localStorage["progStartLns"] = window["proglns"].value;
+	if (rget("tbo") > 0) {turborun();}
+	var proglns = getLines();
+	var cln = rgete("pos");
+	if (runln(proglns[cln]) != 1) { logexec(cln + ": " + proglns[cln]); }
+	var nln = rgete("pos");
+	if (nln != cln) { logexec(cln + "> "+proglns[nln]); }
+	rince("pos");
+	if ((rget("flags") & 128) == 128 || err > 0) { logexec("-- ERROR --"); }
+	else if( proglns[rgete("pos")] == "end") { rsete("pos", 0); updmem(); }
+	else { requestAnimationFrame(progrun); }
+}
+function turborun(){
+	var proglns = getLines();
+	linesvalid = 1;
+	var lps = 0;
+	while ((rget("flags") & 128) == 0 && err <= 0 && proglns[rgete("pos")] != "end" && proglns[rgete("pos")] != "rets" && rget("tbo") > 0 && lps < rget("tbo") && linesvalid == 1){
+		//proglns = getLines(); // Removing this speeds it up, but it breaks subs.
+		runln(proglns[rgete("pos")]);
+		rince("pos");
+		lps++;
+	}
+	if( proglns[rgete("pos")] == "end") { rsete("pos", 0); }
+}
+function f_or(x1, x2) { return (x1 == 1 || x2 == 1) ? 1 : 0; }
+function f_xor(x1, x2) { return (x1 == x2) ? 0 : 1; }
+
+// Computation Level
+function isReg(thst){
+	var rgnms = ["int", "flags", "sp", "bp", "posh", "posl", "tbo", "mem",
+				"r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7"];
+	return rgnms.includes(thst);
+}
+function isMem(thst){
+	//TODO: Make it actually evaluate the internals of the brackets?
+	return thst.startsWith("[") & thst.endsWith("]");
+}
+function c_err(errmsg){
+	if (!(errmsg === undefined)) console.error(errmsg);
+	rset("flags", rget("flags") | 128);
+}
+//function c_turb(nval){
+	//if (nval == 0 && turb == 1) updmem();
+	//turb = nval;
+//}
+
+function c_int(cval){
+	if (cval == 0) { c_int_0(); return;}
+	c_err("Invalid interrupt code: " + cval);
+}
+function c_int_0(){ rset("r0", lmdX);rset("r1", lmdY); }
+
+function c_mov(regnam, nval){ if (isMem(regnam)) { mset(regnam, nval); } else { rset(regnam, nval); } } // What if it's a memloc? 
+function c_movl(regnam, nval){ rsetl(regnam, nval); } // What if it's a memloc?
+function c_movh(regnam, nval){ rseth(regnam, nval); } // What if it's a memloc?
+function c_add(regnam, nval){ 
+	if (isReg(regnam)){
+		rset(regnam, rget(regnam) + nval); 
+	} else {
+		mset(regnam, mget(regnam) + nval);
+	}
+}
+function c_sub(regnam, nval){ 
+	if (isReg(regnam)){
+		nval = rget(regnam) - nval; while (nval<0) nval += 256;
+		rset(regnam, nval);
+	} else {
+		nval = mget(regnam) - nval; while (nval<0) nval += 256;
+		mset(regnam, nval);
+	}
+}
+function c_and(regnam, nval){ rset(regnam, rget(regnam) & nval); }
+function c_or(regnam, nval){ rset(regnam, rget(regnam) | nval); }
+function c_xor(regnam, nval){ rset(regnam, rget(regnam) ^ nval); }
+function c_swp(rega, regb){
+	var swpa = rget(rega);
+	rset(rega, rget(regb));
+	rset(regb, swpa);
+}
+function c_cmp(oval, nval){
+	var cflag = rget("flags");
+	cflag = cflag & 252;
+	if (oval == nval) {
+		cflag = cflag | 3;
+	} else if (oval > nval){
+		cflag = cflag | 2;
+	} else if (oval < nval){
+	    cflag = cflag | 1;
+	}
+	rset("flags", cflag);
+}
+function c_shr(regnam, bts){
+	var nstring = rget(regnam).toString(2);
+	while (nstring.length < 8) nstring = "0" + nstring;
+	if (nstring.length > 8) nstring = nstring.substr(-8);
+	for (var lps = 0; lps < bts; lps++){
+		nstring = "0" + nstring.substr(0,7) ;
+	}
+	//console.warn(nstring);
+	rset(regnam, parseInt(nstring, 2));
+}
+function c_shl(regnam, bts){
+	var nstring = rget(regnam).toString(2);
+	while (nstring.length < 8) nstring = "0" + nstring;
+	if (nstring.length > 8) nstring = nstring.substr(-8);
+	for (var lps = 0; lps < bts; lps++){
+		nstring = nstring.substr(1) + "0";
+	}
+	//console.warn(nstring);
+	rset(regnam, parseInt(nstring, 2));
+}
+function c_rol(regnam, bts){
+	var nstring = rget(regnam).toString(2);
+	while (nstring.length < 8) nstring = "0" + nstring;
+	if (nstring.length > 8) nstring = nstring.substr(-8);
+	for (var lps = 0; lps < bts; lps++){
+		nstring = nstring.substr(1) + nstring.substr(0,1);
+	}
+	console.warn(nstring);
+	rset(regnam, parseInt(nstring, 2));
+}
+function c_rnd(){ rset("r0", getRandomIntInclusive(0,255)); }
+function c_jmp(dest){ rsete("pos", dest); if (isNaN(dest)) { c_err("Jump to NaN"); } }
+function c_jz(dest){ if ((rget("flags") & 3) == 3) rsete("pos", dest); if (isNaN(dest)) { c_err("Jump to NaN"); } }
+function c_jnz(dest){ if ((rget("flags") & 3) != 3) rsete("pos", dest); if (isNaN(dest)) { c_err("Jump to NaN"); } }
+function c_jg(dest){ if ((rget("flags") & 3) == 2) rsete("pos", dest); if (isNaN(dest)) { c_err("Jump to NaN"); } }
+function c_jl(dest){ if ((rget("flags") & 3) == 1) rsete("pos", dest); if (isNaN(dest)) { c_err("Jump to NaN"); } }
+function c_sz(dest){ if ((rget("flags") & 3) == 3) radde("pos", dest); }
+function c_snz(dest){ if ((rget("flags") & 3) != 3) radde("pos", dest); }
+
+function c_runsub(dest){
+	if (localStorage["sub_p" + dest] === undefined)
+	{ c_err("Sub does not exist: \"" + dest + "\""); }
+	else {
+		rets.push({posl: rget("posl"), posh: rget("posh"), lns: proglns.value});
+		loadLines(dest); 
+		localStorage["restoreText"] = localStorage["progStartLns"];
+		rset("posh", 0);
+		rset("posl", 0); 
+	}
+}
+
+function c_retsub(){
+	if (rets.length < 1){ c_err("Cannot return from sub."); }
+	var ttrt = rets.pop();
+	proglns.value = ttrt.lns;
+	rset("posh", ttrt.posh);
+	rset("posl", ttrt.posl);
+}
+
+
+// Memory
+function mloceval(memd){
+	if (memd.startsWith("[") & memd.endsWith("]"))
+		memd = memd.substring(1,memd.length-1);
+	var lnspl = memd.match(/\[.+\]|\w+|[\+\-]/g);
+	if (lnspl.length == 1) {
+		return regVal(lnspl[0]);
+	} else if (lnspl.length == 3){
+		var lft = regVal(lnspl[0]);
+		var rgt = regVal(lnspl[2]);
+		if (lnspl[1] == "+") return lft + rgt;
+		else if (lnspl[1] == "-") return lft - rgt;
+		console.warn("Invalid memloc: " + memd);
+	}
+}
+function mset(memloc, nval){
+	var mloc = mloceval(memloc);
+	//console.log("mset loc: " + memloc);
+	//if (memloc.substr(1,1) == "d") { mloc = parseInt(memloc.substr(2), 10);}
+	//else { mloc = parseInt(memloc.substr(1), 2); }
+	//if (isReg(memloc.substr(1))){ mloc = rget(memloc.substr(1)); }
+	inmem[mloc] = nval;
+	if (rget("tbo") == 0) updmem();
+}
+function mget(memloc){
+	//console.log("mgetting " + memloc);
+	/*
+	if (memloc.substr(1,1) == "d") { mloc = parseInt(memloc.substr(2), 10);}
+	else { mloc = parseInt(memloc.substr(1), 2); }
+	if (isReg(memloc.substr(1))){ mloc = rget(memloc.substr(1)); }*/
+	//var lnspl = mloc.match(/\[.+\]|([^\s]\w+)/g);
+	
+	//console.warn(mloceval(memloc));
+	return inmem[mloceval(memloc)];
+}
+function m_push(nval){
+	if (nval == "pos") { m_push(rget("posl")); m_push(rget("posh")); return;}
+	if (isNaN(nval)) { c_err("Cannot push, not a number."); return; }
+	inmem[rget("sp")] = nval;
+	c_sub("sp", 1);
+	if (rget("tbo") == 0) updmem();
+}
+function m_pop(regnam){
+	if (!isReg(regnam)) c_err("Not a register: " + regnam);
+	c_add("sp", 1);
+	rset(regnam, inmem[rget("sp")]);
+	if (rget("tbo") == 0) updmem();
+}
+
+function m_pushall(){
+	m_push(rget("r0"));
+	m_push(rget("r1"));
+	m_push(rget("r2"));
+	m_push(rget("r3"));
+	m_push(rget("r4"));
+	m_push(rget("r5"));
+	m_push(rget("r6"));
+	m_push(rget("r7"));
+}
+function m_popall(){
+	m_pop("r7");
+	m_pop("r6");
+	m_pop("r5");
+	m_pop("r4");
+	m_pop("r3");
+	m_pop("r2");
+	m_pop("r1");
+	m_pop("r0");
+}
+// Screen
+function s_fill(colr){
+	scr.fillStyle = colr;
+	scr.fillRect(0,0,256,256);
+}
+function s_clr(){ s_fill("#000000"); }
+function s_pnt(){
+	scr.fillStyle = "rgb(" + (rget("r2")) + "," + rget("r3") + "," + rget("r4") + ")";
+	scr.fillRect(rget("r0"), rget("r1"),1,1);
+}
+function s_peek(){
+	var clor = scr.getImageData(rget("r0"), rget("r1"), 1, 1).data;
+	rset("r2", clor[0]);
+	rset("r3", clor[1]);
+	rset("r4", clor[2]);
+	
+}
+function s_lin(){
+	var ova = rget("r0");
+	m_pop("r0"); y2 = rget("r0"); m_pop("r0"); x2 = rget("r0");
+	m_pop("r0"); y1 = rget("r0"); m_pop("r0"); x1 = rget("r0");
+	rset("r0", ova);
+	scr.strokeStyle = "rgb(" + (rget("r2")) + "," + rget("r3") + "," + rget("r4") + ")";
+	scr.beginPath(); scr.moveTo(x1, y1);	scr.lineTo(x2, y2);	scr.stroke(); scr.strokeStyle = "";
+}
+function s_rect(){
+	var ova = rget("r0");
+	m_pop("r0"); y2 = rget("r0"); m_pop("r0"); x2 = rget("r0");
+	m_pop("r0"); y1 = rget("r0"); m_pop("r0"); x1 = rget("r0");
+	rset("r0", ova); // Restore old value
+	scr.fillStyle = "rgb(" + (rget("r2")) + "," + rget("r3") + "," + rget("r4") + ")";
+	scr.fillRect(x1,y1,x2,y2); scr.fillStyle = "";
+}
+function s_recta(){
+	var ova = rget("r0");
+	m_pop("r0"); y2 = rget("r0"); m_pop("r0"); x2 = rget("r0");
+	m_pop("r0"); y1 = rget("r0"); m_pop("r0"); x1 = rget("r0");
+	rset("r0", ova);
+	scr.fillStyle = "rgb(" + (rget("r2")) + "," + rget("r3") + "," + rget("r4") + ")";
+	scr.globalAlpha = rget("r5")/255;
+	scr.fillRect(x1,y1,x2,y2); scr.fillStyle = "";
+	scr.globalAlpha = 1.0;
+}
+</script>
+<script>
+
+//$ = function(arg){
+//	throw "Using JQuery for:" + arg;
+//}
+// Init/Run code
+document.addEventListener("DOMContentLoaded", function() {
+	SetupPage();
+
+	var btns = document.getElementsByClassName("navbtn");
+	for (var btnidx = 0; btnidx < btns.length; btnidx++){
+		btns[btnidx].addEventListener("mousedown", navMouseDown);
+		btns[btnidx].addEventListener("mouseup", navMouseUp);
+	}
+
+	//$(".ctrlbtn").mouseup(function(){
+	//	$(this).removeClass("down");
+	//});
+	document.addEventListener('keydown', function(event) {
+		if(event.keyCode == 37) { 		c_and("int",  parseInt("11110000",2));	c_or("int", parseInt("00000010",2)); }
+		else if(event.keyCode == 39) { 	c_and("int",  parseInt("11110000",2));	c_or("int", parseInt("00000011",2)); }
+		else if(event.keyCode == 38) { 	c_and("int",  parseInt("11110000",2));	c_or("int", parseInt("00000001",2)); }
+		else if(event.keyCode == 40) { 	c_and("int",  parseInt("11110000",2));	c_or("int", parseInt("00000100",2)); }
+		else if(event.keyCode == 32) { 	c_and("int",  parseInt("11110000",2));	c_or("int", parseInt("00000101",2)); }
+	});
+	document.addEventListener('keyup', function(event) {
+		if ((rget("int") & 128) == 128) { c_and("int", parseInt("11110000",2)); }
+	});
+	vscreen.addEventListener("mousedown", function(evt){
+		c_and("int", parseInt("11110000",2));
+		c_or("int", parseInt("00000110",2));
+		lmdX = evt.offsetX;
+		lmdY = evt.offsetY;
+		if (lmdX < 0) lmdX = 0;
+		if (lmdY < 0) lmdY = 0;
+		//console.log(evt);
+	});
+	vscreen.addEventListener("mousemove", function(evt){
+		lmdX = evt.offsetX;
+		lmdY = evt.offsetY;
+		if (lmdX < 0) lmdX = 0;
+		if (lmdY < 0) lmdY = 0;
+		//console.log(evt.offsetX + " " + evt.offsetY);
+	});
+	vscreen.addEventListener("mouseuo", function(evt){
+		if ((rget("int") & 128) == 128) { c_and("int", parseInt("11110000",2)); }
+	});
+
+	btns = document.getElementsByClassName("ctrlbtn");
+	for (var btnidx = 0; btnidx < btns.length; btnidx++){
+		btns[btnidx].addEventListener("mousedown", function(){
+			this.classList.add("down");	
+			switch(this.getAttribute("cmd")){
+				case "run":
+					this.parentElement.removeChild(this);
+					progrun();
+					break;
+			}
+		});
+		//if ($(this).attr("cmd") == "run") {
+		//	$(this).detach();
+		//	progrun();
+		//} else if ($(this).attr("cmd") == "step"){
+		//	progstep();
+		//} else if ($(this).attr("cmd") == "rst"){
+		//	rsete("pos", "00000000");
+		//	err = 0;
+		//}
+	}
+	
+	scr = vscreen.getContext('2d');
+	s_clr();
+	
+	if (localStorage["restoreText"] === undefined){
+	}else{
+		proglns.value = localStorage["restoreText"];
+	}
+	proglns.addEventListener("keyup", function(){ localStorage["restoreText"] = proglns.value; });
+});
+
+function navMouseDown(evt){
+	c_or("int",  parseInt(this.getAttribute("mask"), 2));
+	this.classList.add("down");
+}
+function navMouseUp(evt){
+	if ((rget("int") & 128) == 128) {
+		c_and("int", parseInt("11110000",2));
+	}
+	this.classList.remove("down");
+}
+</script>
+<style>
+
+.chgdOOOOOOOOOOOOOOOOOOO { background-color: #FFFAFA; }
+.chgdOOOOOOOOOOOOOOOOOO { background-color: #FFFAFA; }
+.chgdOOOOOOOOOOOOOOOOO { background-color: #FFEEEE; }
+.chgdOOOOOOOOOOOOOOOO { background-color: #FFEEEE; }
+.chgdOOOOOOOOOOOOOOO { background-color: #FFEEEE; }
+.chgdOOOOOOOOOOOOOO { background-color: #FFEEEE; }
+.chgdOOOOOOOOOOOOO { background-color: #FFDDDD; }
+.chgdOOOOOOOOOOOO { background-color: #FFDDDD; }
+.chgdOOOOOOOOOOO { background-color: #FFDDDD; }
+.chgdOOOOOOOOOO { background-color: #FFDDDD; }
+.chgdOOOOOOOOO { background-color: #FFCCCC; }
+.chgdOOOOOOOO {	background-color: #FFCCCC; }
+.chgdOOOOOOO { background-color: #FFCCCC; }
+.chgdOOOOOO { background-color: #FFCCCC; }
+.chgdOOOOO { background-color: #FFBBBB; }
+.chgdOOOO {	background-color: #FFBBBB; }
+.chgdOOO { background-color: #FFBBBB; }
+.chgdOO { background-color: #FFBBBB; }
+.chgdO { background-color: #FFAAAA; }
+.chgd {	background-color: #FF9999; }
+
+
+.navbtn {
+	border-radius: 5px;
+	border: 2px outset lightgrey;
+	width:20px;
+	height: 20px;
+	background-color: lightgrey;
+	cursor: pointer;
+}
+.navbtn:hover {
+	background-color: #DDD;
+	border-color: #DDD;
+}
+.ctrlbtn {
+	display: inline-block;
+	border-radius: 5px;
+	border: 2px outset lightgrey;
+	background-color: lightgrey;
+	cursor: pointer;
+	margin-bottom: 4px;
+	padding: 0px 4px;
+}
+.ctrlbtn:hover {
+	background-color: #DDD;
+	border-color: #DDD;
+}
+.down {
+	border-style:inset;
+}
+.reglab {
+	border: 0px solid grey;
+	border-top-width: 2px;
+	border-radius: 10px;
+}
+.reg {
+	border: 0px solid grey;
+	border-bottom-width: 2px;
+	border-radius: 10px;
+	padding-left: 4px;
+	padding-right: 4px;
+}
+.memdiv {
+	display: inline-block;
+	margin: 0px 2px;
+	font-size: .8em;
+}
+.cursp {
+	background: lightgreen;
+}
+.curbp {
+	background: lightblue;
+}
+.curbp.cursp {
+	background: cyan;
+}
+</style>
+</head>
+
+<body>
+<table><tr><td>
+<div class='ctrlbtn' cmd='run'>Run</div><div cmd='step' class='ctrlbtn' style='margin-left:6px;'>Step</div><div cmd='rst' class='ctrlbtn' style='margin-left:6px;'>Reset</div>
+<div>
+<canvas id='vscreen' width='256' height='256' style='border: 2px inset lightgrey;'>
+</canvas>
+</div>
+<div>
+<table>
+<tr><td></td><td class='navbtn' mdir='u' mask='00000001'></td><td></td></tr>
+<tr><td class='navbtn' mdir='l' mask='00000010'></td><td class='navbtn' mdir='c' mask='00000101' align='center'>O</td><td class='navbtn' mdir='r' mask='00000011'></td></tr>
+<tr><td></td><td class='navbtn' mdir='d' mask='00000100'></td><td></td></tr>
+</table>
+</div>
+</td><td style='width: 400px;'>
+<textarea style='height: 400px; width: 100%;' id='proglns'></textarea>
+</td><td style='padding-left: 10px;'>
+<table id='regtab'>
+
+</table>
+</td><td style='height: 100%;' id='execlg' valign='top'></td></tr>
+</table>
+<div id='omem'></div>
+</body>
+</html>
