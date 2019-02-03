@@ -3,6 +3,13 @@ Javascript in-browser assembler
 
 This was a project I used to teach myself how to use JQuery. I have since eliminated the requirement for the JQuery library, but left the old code in 'jqcmp_oldjquery.html' and 'jqtest_oldjquery.html'. 
 
+## Hello World example
+To run the example:
+1. Copy the jsCompiler and jsAssembler to an executable location.
+1. Run the jsCompiler and click `compile`.
+1. Run the jsAssembler and click `run` in the top left.
+1. Enjoy watching the stack and base pointers! :D
+
 ## Notes
 
 The jsAssembler will contain information on each available opcode. -TODO
