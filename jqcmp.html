@@ -48,12 +48,108 @@ define K_CNTR 10000101
 ext DefASCII
 //ext 4X4ASCIIFont
 define CHAR__ d32
+define CHAR_! d33
 
 macro "pushstr"-unk { "push d0", reachchr %1% {"push CHAR_%0%"} }
 
 macro "ifkdn"-num-lab|"ifkdn"-mem-lab { "cmp int %1%", "jz _%2%" }
 macro "ifeq"-num-num-lab|"ifeq"-mem-num-lab|"ifeq"-num-mem-lab|"ifeq"-mem-mem-lab { "cmp %1% %2%", "jz _%3%" }
-macro "setkdn"-num-mem-num { "cmp int %1%", "snz 00000001", "mov %2% %3%" }`;
+macro "setkdn"-num-mem-num { "cmp int %1%", "snz 00000001", "mov %2% %3%" }
+
+ckeys
+call main
+~end
+function main {
+  point d10 d10
+  rgb d0 d255 d0
+  //~turbo d100
+  pushstr HELLO_WORLD!
+  call printstr
+  ~mov sp bp
+  ~mov tbo d0
+}
+
+// I'm lazy, clean up your own stack. ('add sp dStringLen+1' after func ret)
+function printstr {
+  local curchr
+  curchr = d3
+  ~:_printstr_lp
+  curchr + d1
+  ~mov r7 curchr
+  ~mov r6 [bp + r7]
+  ~cmp r6 d0
+  ~jz _printstr_end
+  
+  call printchr
+  ~jmp _printstr_lp
+  ~:_printstr_end
+}
+macro "char4map"-num-mem-num-mem-num {"cmp r6 %1%", "snz d3", "mov %2% %3%", "mov %4% %5%", "jmp _printchr_parts"}
+function printchr {
+  local prta
+  local prtb
+  ~cmp r6 d32
+  ~snz d2
+  ~add r0 d4
+  ~jmp _printchr_nd
+  char4map CHAR_E prta 11101000 prtb 11001110
+  char4map CHAR_T prta 11100100 prtb 01000100
+  char4map CHAR_A prta 01001010 prtb 11101010
+  char4map CHAR_O prta 11101010 prtb 10101110
+  char4map CHAR_I prta 11100100 prtb 01001110
+  char4map CHAR_N prta 11001010 prtb 10101010
+  char4map CHAR_S prta 01101100 prtb 00101100
+  char4map CHAR_H prta 10101010 prtb 11101010
+  char4map CHAR_R prta 11001010 prtb 11001010
+  char4map CHAR_D prta 11001010 prtb 10101100
+  char4map CHAR_L prta 10001000 prtb 10001110
+  char4map CHAR_U prta 10101010 prtb 10101110
+  char4map CHAR_C prta 01101000 prtb 10000110
+  char4map CHAR_M prta 11101110 prtb 10101010
+  char4map CHAR_F prta 11101000 prtb 11001000
+  char4map CHAR_W prta 10101010 prtb 11101110
+  char4map CHAR_! prta 01000100 prtb 00000100
+  ~mov prta 01001000
+  ~mov prtb 00100100
+  printchr_parts:
+  ~mov r7 d0
+  printchr_partalp:
+  ~mov r6 prta
+  ~shl r6 r7
+  ~add r7 d1
+  ~and r6 10000000
+  ~cmp r6 10000000
+  ~snz d1
+  ~pnt
+  ~add r0 d1
+  ~cmp r7 d4
+  ~snz d2
+  ~sub r0 d4
+  ~add r1 d1
+  ~cmp r7 d9
+  ~jl _printchr_partalp
+  ~sub r0 d5
+  ~add r1 d1
+  ~mov r7 d0
+  printchr_partblp:
+  ~mov r6 prtb
+  ~shl r6 r7
+  ~add r7 d1
+  ~and r6 10000000
+  ~cmp r6 10000000
+  ~snz d1
+  ~pnt
+  ~add r0 d1
+  ~cmp r7 d4
+  ~snz d2
+  ~sub r0 d4
+  ~add r1 d1
+  ~cmp r7 d9
+  ~jl _printchr_partblp
+  ~sub r1 d3
+  ~sub r0 d1
+  printchr_nd:
+}`;
 
 function parselines(alltxt){
 	var otlns = [];
@@ -477,7 +573,7 @@ function structure(lth){
 		var tcm = lth[idx];
 		if (tcm.startsWith("[") & tcm.endsWith("]")){
 			lth[idx] = "mem";
-		} else if(tcm.startsWith("d") & (typeof parseInt(tcm.substr(1)) == "number") || isBinary(tcm)){
+		} else if(tcm.startsWith("d") & (!isNaN(tcm.substr(1))) || isBinary(tcm)){
 			lth[idx] = "num";
 		} else if(tcm == "+" | tcm == "-" | tcm == "*" | tcm == "/" | tcm == "="){
 			lth[idx] = "oper";
