@@ -43,13 +43,22 @@ Replaces literally with the zero-based nth argument.
 
 Example: `macro mem-"="-nummem { "mov %0% %2%" }`
 
-#### `def` { def [name] [value] }
+#### `def` : def [name] [value]
 Defines a string as something, then replaces all instances of it.
 
 Example: 
 ```
 macro "define"-unk-num { def %1% %2% }
 define pi 3.14
+```
+
+#### `?def` | `?!def`
+Only executes code block if compiler has defined a term. (or has not defined a term, in the case of `?!def`)
+
+Example:
+```
+// In this example, the macro uses ?!def to check if ckeys has already appeared in the program.
+macro "ckeys" {?!def CKEYS {"or int 10000000", def CKEYS 1} }
 ```
 
 #### `eachchr` | `reachchr` : eachchr [value] [code block]

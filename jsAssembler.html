@@ -6,6 +6,7 @@
 var scr = null;
 var err = 0;
 var inmem = null;
+var inmem_desc = null;
 var memlen = 256;
 var execloglen = 20;
 var lmdX = 0;
@@ -31,6 +32,7 @@ function SetupPage(){
 	}
 	
 	inmem = Array(memlen);
+	inmem_desc = Array(memlen);
 	for (var i = 0; i < memlen; i++) inmem[i]=0;
 	updmem();
 	
@@ -154,7 +156,8 @@ function updmem(){
 		if (nstring.length > 8) nstring = nstring.substr(-8);
 		var mclasses = "memdiv";
 		if (cspl == i) mclasses += " cursp"; if (cbpl == i) mclasses += " curbp";
-		outm += "<div class='" + mclasses + "'>" + nstring + "</div>";
+		
+		outm += "<div class='" + mclasses + "' title='" + inmem_desc[i] + "'>" + nstring + "</div>";
 	}
 	omem.innerHTML = outm;
 }
@@ -442,10 +445,11 @@ function mget(memloc){
 	//console.warn(mloceval(memloc));
 	return inmem[mloceval(memloc)];
 }
-function m_push(nval){
+function m_push(nval, desc){
 	if (nval == "pos") { m_push(rget("posl")); m_push(rget("posh")); return;}
 	if (isNaN(nval)) { c_err("Cannot push, not a number."); return; }
 	inmem[rget("sp")] = nval;
+	inmem_desc[rget("sp")] = desc || "";
 	c_sub("sp", 1);
 	if (rget("tbo") == 0) updmem();
 }
@@ -680,6 +684,9 @@ function navMouseUp(evt){
 	margin: 0px 2px;
 	font-size: .8em;
 }
+.hasdesc {
+	background: lightyellow;
+}
 .cursp {
 	background: lightgreen;
 }
@@ -714,6 +721,13 @@ function navMouseUp(evt){
 </table>
 </td><td style='height: 100%;' id='execlg' valign='top'></td></tr>
 </table>
+<div style='border: 0px solid grey; border-top-width: 2px; border-radius: 10px;'><div align='center'>Memory</div>
 <div id='omem'></div>
+</div>
+<div id='infdiv' style='width: 100%;'>
+	<div style='float: left;'>
+		<div>mov</div>
+	</div><div>Info</div>
+</div>
 </body>
 </html>
