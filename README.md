@@ -3,12 +3,18 @@ Javascript in-browser assembler
 
 This was a project I used to teach myself how to use JQuery. I have since eliminated the requirement for the JQuery library, but left the old code in 'jqcmp_oldjquery.html' and 'jqtest_oldjquery.html'. 
 
+## Quick sample
+The fastest way to sample this project is to:
+1. Copy the RAW contents of jsAssembler.html
+2. Go to jsfiddle.net and paste in the HTML box
+3. Click run and enjoy!
+
 ## Hello World example
 To run the example:
 1. Copy the jsCompiler.html and jsAssembler.html to an executable location.
-1. Open jsCompiler.html in browser and click `compile`.
-1. Open jsAssembler.html in browser and click `run` in the top left.
-1. Enjoy watching the stack and base pointers! :D
+2. Open jsCompiler.html in browser and click `compile`.
+3. Open jsAssembler.html in browser and click `run` in the top left.
+4. Enjoy watching the stack and base pointers! :D
 
 ## Notes
 
