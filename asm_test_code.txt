@@ -445,7 +445,7 @@ jmp _aftmov
 
 
 
--- AWESOME THING --
+-- Sierpinski --
 turbo 1
 mov r2 d254
 mov r3 d254
@@ -476,7 +476,7 @@ mov r2 d254
 mov r3 d254
 jnz _st
 
--- AWESOME THING VER 2 --
+-- Sierpinski VER 2 --
 turbo d5
 mov r2 d255
 mov r3 d255
