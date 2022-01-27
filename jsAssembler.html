@@ -598,6 +598,50 @@ document.addEventListener("DOMContentLoaded", function() {
 	s_clr();
 	
 	if (localStorage["restoreText"] === undefined){
+		/// Default to sierpinski program
+		proglns.value = `turbo d5
+mov r2 d255
+mov r3 d255
+mov r4 d255
+:_st
+turbo d1000
+add r0 d1
+mov r1 r0
+and r1 r6
+mov r7 r1
+shr r7 d1
+sub r0 r7
+pnt
+xor r1 11111111
+xor r0 11111111
+:xor r2 11111111
+xor r3 11111111
+xor r4 11111111
+add r0 d128
+pnt
+sub r0 d128
+xor r0 11111111
+xor r1 11111111
+:xor r2 11111111
+xor r3 11111111
+xor r4 11111111
+add r0 r7
+cmp r0 d0
+jnz _st
+add r6 d1
+cmp r3 d1
+sz d2
+sub r3 d2
+jmp _st
+cmp r4 d1
+sz d2
+sub r4 d2
+jmp _st
+cmp r4 00011110
+sub r4 d32
+mov r2 d254
+mov r3 d254
+:jnz _st`;
 	}else{
 		proglns.value = localStorage["restoreText"];
 	}
