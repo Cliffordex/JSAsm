@@ -599,12 +599,12 @@ document.addEventListener("DOMContentLoaded", function() {
 	
 	if (localStorage["restoreText"] === undefined){
 		/// Default to sierpinski program
-		proglns.value = `turbo d5
+		proglns.value = `mov tbo d5
 mov r2 d255
 mov r3 d255
 mov r4 d255
 :_st
-turbo d1000
+mov tbo d1000
 add r0 d1
 mov r1 r0
 and r1 r6
