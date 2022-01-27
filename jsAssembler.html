@@ -198,6 +198,7 @@ function runln(inln){
 	var lnspl = inln.match(/\[.+\]|([^\s]\w+)/g);
 	if (lnspl.length < 1) { return; /* empty line */ }
 	if (lnspl[0].substr(0,1) == ":") { return; /* compiler destination */ }
+  if (lnspl[0].substr(0,1) == ";") { return; /* remark/nop */ }
 	if (lnspl[0] == "nop") { return; }
 	if (lnspl[0] == "rnd") { c_rnd(); return; }
 	if (lnspl[0] == "pnt") { s_pnt(); return; }
@@ -581,6 +582,9 @@ document.addEventListener("DOMContentLoaded", function() {
 					this.parentElement.removeChild(this);
 					progrun();
 					break;
+        case "stop":
+        	c_or("int", 128);
+          break;
 			}
 		});
 		//if ($(this).attr("cmd") == "run") {
@@ -614,7 +618,7 @@ sub r0 r7
 pnt
 xor r1 11111111
 xor r0 11111111
-:xor r2 11111111
+;xor r2 11111111
 xor r3 11111111
 xor r4 11111111
 add r0 d128
@@ -622,7 +626,7 @@ pnt
 sub r0 d128
 xor r0 11111111
 xor r1 11111111
-:xor r2 11111111
+;xor r2 11111111
 xor r3 11111111
 xor r4 11111111
 add r0 r7
@@ -641,7 +645,7 @@ cmp r4 00011110
 sub r4 d32
 mov r2 d254
 mov r3 d254
-:jnz _st`;
+;jnz _st`;
 	}else{
 		proglns.value = localStorage["restoreText"];
 	}
@@ -745,7 +749,8 @@ function navMouseUp(evt){
 
 <body>
 <table><tr><td>
-<div class='ctrlbtn' cmd='run'>Run</div><!--div cmd='step' class='ctrlbtn' style='margin-left:6px;'>Step</div--><!--div cmd='rst' class='ctrlbtn' style='margin-left:6px;'>Reset</div-->
+<div class='ctrlbtn' cmd='run'>Run</div>
+<div class='ctrlbtn' cmd='stop'>Stop</div><!--div cmd='step' class='ctrlbtn' style='margin-left:6px;'>Step</div--><!--div cmd='rst' class='ctrlbtn' style='margin-left:6px;'>Reset</div-->
 <div>
 <canvas id='vscreen' width='256' height='256' style='border: 2px inset lightgrey;'>
 </canvas>
