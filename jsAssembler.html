@@ -178,22 +178,6 @@ function loadLines(progname){
 }
 
 function runln(inln){
-	/*$(".chgd"+mkoes(20)).removeClass("chgd"+mkoes(20));
-	for (var oes = 19; oes > -1; oes--){
-		$(".chgd" + mkoes(oes)).addClass("chgd"+mkoes(oes+1)).removeClass("chgd" + mkoes(oes));
-	}*/
-	/*$(".chgdOOOOOOOO").addClass("chgdOOOOOOOOO").removeClass("chgdOOOOOOOO");
-	$(".chgdOOOOOOO").addClass("chgdOOOOOOOO").removeClass("chgdOOOOOOO");
-	$(".chgdOOOOOO").addClass("chgdOOOOOOO").removeClass("chgdOOOOOO");
-	$(".chgdOOOOO").addClass("chgdOOOOOO").removeClass("chgdOOOOO");
-	$(".chgdOOOO").addClass("chgdOOOOO").removeClass("chgdOOOO");
-	$(".chgdOOO").addClass("chgdOOOO").removeClass("chgdOOO");
-	$(".chgdOO").addClass("chgdOOO").removeClass("chgdOO");
-	$(".chgdO").addClass("chgdOO").removeClass("chgdO");
-	$(".chgd").addClass("chgdO").removeClass("chgd");*/
-
-	//document.getElementsByClassName.removeClass("chgd");
-	
 	if (typeof(inln) === "undefined"){ err=1; console.error("End of program."); return; } //End of program.
 	var lnspl = inln.match(/\[.+\]|([^\s]\w+)/g);
 	if (lnspl.length < 1) { return; /* empty line */ }
@@ -251,8 +235,11 @@ function runln(inln){
 }
 
 function progstep(){
+	localStorage["progStartLns"] = window["proglns"].value;
 	var proglns = getLines();
 	var cln = rgete("pos");
+  if ((rget("flags") & 128) == 128 || err > 0) { logexec("-- ERROR: CANNOT CONTINUE --"); return; }
+  else if( proglns[rgete("pos")] == "end") { rsete("pos", 0); updmem(); }
 	if (runln(proglns[cln]) != 1) { logexec(cln + ": " + proglns[cln]); }
 	var nln = rgete("pos");
 	if (nln != cln) { logexec(cln + "> "+proglns[nln]); }
@@ -569,7 +556,7 @@ document.addEventListener("DOMContentLoaded", function() {
 		if (lmdY < 0) lmdY = 0;
 		//console.log(evt.offsetX + " " + evt.offsetY);
 	});
-	vscreen.addEventListener("mouseuo", function(evt){
+	vscreen.addEventListener("mouseup", function(evt){
 		if ((rget("int") & 128) == 128) { c_and("int", parseInt("11110000",2)); }
 	});
 
@@ -582,20 +569,15 @@ document.addEventListener("DOMContentLoaded", function() {
 					this.parentElement.removeChild(this);
 					progrun();
 					break;
+        case "step":
+        	progstep();
+				this.classList.remove("down");	
+        	break;
         case "stop":
-        	c_or("int", 128);
+        	c_or("flags", 128);
           break;
 			}
 		});
-		//if ($(this).attr("cmd") == "run") {
-		//	$(this).detach();
-		//	progrun();
-		//} else if ($(this).attr("cmd") == "step"){
-		//	progstep();
-		//} else if ($(this).attr("cmd") == "rst"){
-		//	rsete("pos", "00000000");
-		//	err = 0;
-		//}
 	}
 	
 	scr = vscreen.getContext('2d');
@@ -608,14 +590,14 @@ mov r2 d255
 mov r3 d255
 mov r4 d255
 :_st
-mov tbo d1000
+mov tbo d0 ; d100 to see picture faster
 add r0 d1
 mov r1 r0
 and r1 r6
 mov r7 r1
 shr r7 d1
 sub r0 r7
-pnt ;r0:x r1:y r2:r r3:g r4:b
+pnt
 xor r1 11111111
 xor r0 11111111
 ;xor r2 11111111
@@ -663,93 +645,12 @@ function navMouseUp(evt){
 	this.classList.remove("down");
 }
 </script>
-<style>
-
-.chgdOOOOOOOOOOOOOOOOOOO { background-color: #FFFAFA; }
-.chgdOOOOOOOOOOOOOOOOOO { background-color: #FFFAFA; }
-.chgdOOOOOOOOOOOOOOOOO { background-color: #FFEEEE; }
-.chgdOOOOOOOOOOOOOOOO { background-color: #FFEEEE; }
-.chgdOOOOOOOOOOOOOOO { background-color: #FFEEEE; }
-.chgdOOOOOOOOOOOOOO { background-color: #FFEEEE; }
-.chgdOOOOOOOOOOOOO { background-color: #FFDDDD; }
-.chgdOOOOOOOOOOOO { background-color: #FFDDDD; }
-.chgdOOOOOOOOOOO { background-color: #FFDDDD; }
-.chgdOOOOOOOOOO { background-color: #FFDDDD; }
-.chgdOOOOOOOOO { background-color: #FFCCCC; }
-.chgdOOOOOOOO {	background-color: #FFCCCC; }
-.chgdOOOOOOO { background-color: #FFCCCC; }
-.chgdOOOOOO { background-color: #FFCCCC; }
-.chgdOOOOO { background-color: #FFBBBB; }
-.chgdOOOO {	background-color: #FFBBBB; }
-.chgdOOO { background-color: #FFBBBB; }
-.chgdOO { background-color: #FFBBBB; }
-.chgdO { background-color: #FFAAAA; }
-.chgd {	background-color: #FF9999; }
-
-
-.navbtn {
-	border-radius: 5px;
-	border: 2px outset lightgrey;
-	width:20px;
-	height: 20px;
-	background-color: lightgrey;
-	cursor: pointer;
-}
-.navbtn:hover {
-	background-color: #DDD;
-	border-color: #DDD;
-}
-.ctrlbtn {
-	display: inline-block;
-	border-radius: 5px;
-	border: 2px outset lightgrey;
-	background-color: lightgrey;
-	cursor: pointer;
-	margin-bottom: 4px;
-	padding: 0px 4px;
-}
-.ctrlbtn:hover {
-	background-color: #DDD;
-	border-color: #DDD;
-}
-.down {
-	border-style:inset;
-}
-.reglab {
-	border: 0px solid grey;
-	border-top-width: 2px;
-	border-radius: 10px;
-}
-.reg {
-	border: 0px solid grey;
-	border-bottom-width: 2px;
-	border-radius: 10px;
-	padding-left: 4px;
-	padding-right: 4px;
-}
-.memdiv {
-	display: inline-block;
-	margin: 0px 2px;
-	font-size: .8em;
-}
-.hasdesc {
-	background: lightyellow;
-}
-.cursp {
-	background: lightgreen;
-}
-.curbp {
-	background: lightblue;
-}
-.curbp.cursp {
-	background: cyan;
-}
-</style>
 </head>
 
 <body>
 <table><tr><td>
 <div class='ctrlbtn' cmd='run'>Run</div>
+<div class='ctrlbtn' cmd='step'>Step</div>
 <div class='ctrlbtn' cmd='stop'>Stop</div><!--div cmd='step' class='ctrlbtn' style='margin-left:6px;'>Step</div--><!--div cmd='rst' class='ctrlbtn' style='margin-left:6px;'>Reset</div-->
 <div>
 <canvas id='vscreen' width='256' height='256' style='border: 2px inset lightgrey;'>
