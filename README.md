@@ -6,7 +6,9 @@ This was a project I used to teach myself how to use JQuery. I have since elimin
 ## Quick sample
 
 Click the following links for 
+
 [The Assembler](https://cliffordex.github.io/JSAsm/jsAssembler.html)
+
 [The Compiler](https://cliffordex.github.io/JSAsm/jsCompiler.html)
 
 ## Hello World example
